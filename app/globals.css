@@ -105,6 +105,15 @@ details.settings[open] summary { margin-bottom: 8px; }
 .stat { background: var(--paper-2); border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; font-size: 13px; }
 .stat b { font-size: 17px; display: block; color: var(--ink); }
 .stat span { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+button.stat { appearance: none; font: inherit; text-align: left; color: inherit; }
+.filler-stat.clickable { cursor: pointer; transition: 0.15s; }
+.filler-stat.clickable:hover { border-color: var(--accent); }
+.filler-stat:disabled { cursor: default; }
+
+.filler-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; }
+.filler-item { font-size: 13px; line-height: 1.55; background: #fffdf6; border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; }
+.filler-item .ctx { color: var(--muted); }
+.filler-item mark { background: #ffe08a; color: #6b4e00; border-radius: 3px; padding: 0 4px; font-weight: 700; }
 
 /* hodnocení */
 .eval { font-size: 16px; }

@@ -13,10 +13,56 @@ const LS = {
   notes: "tm_notes",
 };
 
-const FILLERS: Record<Lang, string[]> = {
-  "cs-CZ": ["ehm", "ehmm", "em", "hmm", "prostě", "takže", "jako", "no", "vlastně", "jaksi", "žejo", "jakoby", "tak nějak"],
-  "en-US": ["um", "uh", "like", "you know", "so", "basically", "actually", "kind of", "sort of", "i mean", "right"],
+// Pořadí = priorita: delší / specifičtější fráze první.
+const FILLER_WORDS: Record<Lang, string[]> = {
+  "cs-CZ": ["tak nějak", "ehm", "ehmm", "em", "emm", "ee", "áá", "hmm", "hm", "mm", "prostě", "takže", "jakoby", "jako", "vlastně", "jaksi", "žejo", "no"],
+  "en-US": ["you know", "i mean", "kind of", "sort of", "um", "uhm", "uh", "erm", "er", "hmm", "mm", "like", "basically", "actually", "right", "well", "so"],
 };
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+// Každé písmeno smí být natažené (opakované) → chytí „eeeem“, „ehmmm“, „nooo“…
+function fillerPattern(phrase: string): string {
+  return phrase
+    .trim()
+    .split(/\s+/)
+    .map((w) =>
+      Array.from(w)
+        .map((ch) => escapeRe(ch) + "+")
+        .join(""),
+    )
+    .join("\\s+");
+}
+function fillerRegex(lang: Lang): RegExp {
+  const body = FILLER_WORDS[lang].map(fillerPattern).join("|");
+  // hranice slova přes unicode písmena (funguje i s diakritikou)
+  return new RegExp("(?<![\\p{L}])(" + body + ")(?![\\p{L}])", "giu");
+}
+
+export type FillerHit = { word: string; index: number; pre: string; post: string };
+function findFillers(t: string, lang: Lang): FillerHit[] {
+  if (!t) return [];
+  const re = fillerRegex(lang);
+  const hits: FillerHit[] = [];
+  let m: RegExpExecArray | null;
+  let guard = 0;
+  while ((m = re.exec(t)) && guard++ < 8000) {
+    const word = m[0];
+    if (!word) {
+      re.lastIndex++;
+      continue;
+    }
+    const idx = m.index;
+    hits.push({
+      word,
+      index: idx,
+      pre: t.slice(Math.max(0, idx - 42), idx),
+      post: t.slice(idx + word.length, idx + word.length + 42),
+    });
+  }
+  return hits;
+}
 
 const I18N = {
   "cs-CZ": { tr: "Přepis projevu", thinking: "Analyzuji projev…" },
@@ -32,17 +78,6 @@ function countWords(t: string): number {
   const m = t.trim().match(/\S+/g);
   return m ? m.length : 0;
 }
-function countFillers(t: string, lang: Lang): number {
-  const low = " " + t.toLowerCase().replace(/[.,!?;:]/g, " ") + " ";
-  let n = 0;
-  for (const f of FILLERS[lang]) {
-    const re = new RegExp("\\s" + f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s", "g");
-    const mm = low.match(re);
-    if (mm) n += mm.length;
-  }
-  return n;
-}
-
 // ---- mini Markdown -> HTML ----
 function escapeHtml(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
@@ -115,6 +150,7 @@ export default function Page() {
   const [red, setRed] = useState(420);
   const [context, setContext] = useState("");
   const [notes, setNotes] = useState("");
+  const [showFillers, setShowFillers] = useState(false);
 
   const recogRef = useRef<any>(null);
   const recordingRef = useRef(false);
@@ -155,7 +191,8 @@ export default function Page() {
 
   // odvozené statistiky
   const words = useMemo(() => countWords(transcript), [transcript]);
-  const fillers = useMemo(() => countFillers(transcript, lang), [transcript, lang]);
+  const fillerHits = useMemo(() => findFillers(transcript, lang), [transcript, lang]);
+  const fillers = fillerHits.length;
   const wpm = elapsed > 5 && words > 0 ? Math.round(words / (elapsed / 60)) : null;
 
   // ---- rozpoznávání řeči ----
@@ -383,11 +420,28 @@ export default function Page() {
                 <b>{wpm ?? "–"}</b>
                 <span>slov/min</span>
               </div>
-              <div className="stat">
+              <button
+                type="button"
+                className={"stat filler-stat" + (fillers ? " clickable" : "")}
+                onClick={() => fillers && setShowFillers((s) => !s)}
+                disabled={!fillers}
+                title={fillers ? "Zobrazit konkrétní výplňová slova" : "Zatím žádná výplňová slova"}
+              >
                 <b>{fillers}</b>
-                <span>výplňová slova</span>
-              </div>
+                <span>výplňová slova {fillers ? (showFillers ? "▾" : "▸") : ""}</span>
+              </button>
             </div>
+            {showFillers && fillers > 0 && (
+              <div className="filler-list">
+                {fillerHits.map((h, i) => (
+                  <div className="filler-item" key={i}>
+                    <span className="ctx">{h.pre ? "…" + h.pre : ""}</span>
+                    <mark>{h.word}</mark>
+                    <span className="ctx">{h.post ? h.post + "…" : ""}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="card" style={{ marginTop: 16 }}>
