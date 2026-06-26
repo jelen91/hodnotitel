@@ -10,6 +10,7 @@ const LS = {
   amber: "tm_amber",
   red: "tm_red",
   context: "tm_context",
+  notes: "tm_notes",
 };
 
 const FILLERS: Record<Lang, string[]> = {
@@ -113,6 +114,7 @@ export default function Page() {
   const [amber, setAmber] = useState(360);
   const [red, setRed] = useState(420);
   const [context, setContext] = useState("");
+  const [notes, setNotes] = useState("");
 
   const recogRef = useRef<any>(null);
   const recordingRef = useRef(false);
@@ -129,10 +131,12 @@ export default function Page() {
     const a = localStorage.getItem(LS.amber);
     const r = localStorage.getItem(LS.red);
     const c = localStorage.getItem(LS.context);
+    const n = localStorage.getItem(LS.notes);
     if (g) setGreen(+g);
     if (a) setAmber(+a);
     if (r) setRed(+r);
     if (c) setContext(c);
+    if (n) setNotes(n);
   }, []);
 
   const showToast = useCallback((msg: string) => {
@@ -433,9 +437,23 @@ export default function Page() {
         {/* PRAVÝ SLOUPEC */}
         <div>
           <div className="card">
+            <h2>✏️ Moje poznámky</h2>
+            <textarea
+              className="note-paper"
+              style={{ minHeight: 160 }}
+              placeholder="Sem si piš vlastní postřehy během projevu — řeč těla, gesta, oční kontakt, energie, hlas… Uloží se automaticky."
+              value={notes}
+              onChange={(e) => {
+                setNotes(e.target.value);
+                persist(LS.notes, e.target.value);
+              }}
+            />
+          </div>
+
+          <div className="card" style={{ marginTop: 16 }}>
             <h2>{I18N[lang].tr}</h2>
             <textarea
-              className="transcript"
+              className="transcript note-paper"
               placeholder="Tady se objeví živý přepis… Můžeš ho i ručně upravit nebo vložit vlastní text a kliknout na „Vyhodnotit“."
               value={transcript}
               onChange={(e) => {
