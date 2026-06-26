@@ -6,6 +6,8 @@ export const maxDuration = 60;
 
 type Body = {
   lang?: string;
+  mode?: "speech" | "improv";
+  topic?: string;
   transcript?: string;
   durationSec?: number;
   wordCount?: number;
@@ -63,6 +65,17 @@ Piš tak, aby si to hodnotitel mohl rychle proletět očima a část přečíst 
 (Jedno cílené doporučení.)`;
 }
 
+function improvSystemPrompt(lang: string): string {
+  if (lang === "en-US") {
+    return `You are a Table Topics (impromptu speaking) evaluator at Toastmasters. You are given the topic/question and ONLY the audio transcript of a SHORT impromptu answer (≈1–2 minutes). You cannot see body language, so do NOT comment on it. Judge only what is audible/textual: did they directly answer the question, structure (a clear opening – one point – a close), use of the time, conviction and commitment, vivid/concrete language, and fluency (rambling, filler words).
+
+Give SHORT, specific, encouraging feedback. Output PLAIN TEXT only — no Markdown, no "#", no "**". 4–7 short lines, you may use "- " dashes for bullets. Start with one genuine strength, give 1–2 concrete suggestions, end with a brief encouragement.`;
+  }
+  return `Jsi hodnotitel improvizovaných odpovědí (Table Topics) v Toastmasters. Dostaneš téma/otázku a POUZE textový přepis KRÁTKÉ improvizované odpovědi (≈1–2 minuty). Nevidíš řeč těla, tak ji nekomentuj. Hodnoť jen to, co je slyšet / je v textu: zda přímo odpověděl na otázku, strukturu (jasný úvod – jedna pointa – závěr), využití času, přesvědčivost a nasazení, konkrétní/obrazný jazyk a plynulost (zabíhání, výplňová slova).
+
+Dej KRÁTKOU, konkrétní a povzbudivou zpětnou vazbu. Vrať POUZE prostý text — žádný Markdown, žádné „#" ani „**". 4–7 krátkých řádků, klidně s odrážkami pomocí „- ". Začni jedním upřímným kladem, dej 1–2 konkrétní doporučení a zakonči krátkým povzbuzením.`;
+}
+
 function fmt(total: number): string {
   const m = Math.floor(total / 60);
   const s = total % 60;
@@ -72,12 +85,24 @@ function fmt(total: number): string {
 function userMessage(b: Body, lang: string): string {
   const en = lang === "en-US";
   const meta: string[] = [];
-  if (b.durationSec && b.durationSec > 0) meta.push((en ? "Duration: " : "Délka: ") + fmt(b.durationSec));
-  if (b.wordCount && b.wordCount > 0) meta.push((en ? "Word count: " : "Počet slov: ") + b.wordCount);
-  const ctx = (b.context || "").trim();
-  if (ctx) meta.push((en ? "Context: " : "Kontext: ") + ctx);
+  if (b.mode === "improv") {
+    const topic = (b.topic || "").trim();
+    if (topic) meta.push((en ? "Topic / question: " : "Téma / otázka: ") + topic);
+  } else {
+    if (b.durationSec && b.durationSec > 0) meta.push((en ? "Duration: " : "Délka: ") + fmt(b.durationSec));
+    if (b.wordCount && b.wordCount > 0) meta.push((en ? "Word count: " : "Počet slov: ") + b.wordCount);
+    const ctx = (b.context || "").trim();
+    if (ctx) meta.push((en ? "Context: " : "Kontext: ") + ctx);
+  }
   const head = meta.length ? meta.join("\n") + "\n\n" : "";
-  const label = en ? "TRANSCRIPT:\n" : "PŘEPIS:\n";
+  const label =
+    b.mode === "improv"
+      ? en
+        ? "ANSWER TRANSCRIPT:\n"
+        : "PŘEPIS ODPOVĚDI:\n"
+      : en
+        ? "TRANSCRIPT:\n"
+        : "PŘEPIS:\n";
   return head + label + (b.transcript || "").trim();
 }
 
@@ -108,14 +133,15 @@ export async function POST(req: Request) {
   }
 
   const lang = body.lang === "en-US" ? "en-US" : "cs-CZ";
+  const improv = body.mode === "improv";
   const client = new Anthropic();
 
   try {
     const stream = await client.messages.create({
       model: "claude-opus-4-8",
-      max_tokens: 2000,
+      max_tokens: improv ? 700 : 2000,
       stream: true,
-      system: systemPrompt(lang),
+      system: improv ? improvSystemPrompt(lang) : systemPrompt(lang),
       messages: [{ role: "user", content: userMessage(body, lang) }],
     });
 

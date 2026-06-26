@@ -160,6 +160,8 @@ footer { color: var(--muted); font-size: 12px; margin-top: 26px; text-align: cen
 .btn-sm:hover { border-color: var(--accent); }
 .btn-sm.danger { background: #f7e2e0; border-color: #e7b3af; color: #9c2a26; }
 .btn-sm.danger:hover { border-color: var(--red); }
+.imp-rec { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.imp-clock { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--muted); font-size: 15px; }
 .imp-topic { margin-top: 6px; font-size: 13px; color: var(--accent); font-style: italic; }
 .imp-eval { margin-top: 8px; white-space: pre-wrap; line-height: 1.55; }
 .imp-meta { margin-top: 8px; font-size: 11px; color: var(--muted); }

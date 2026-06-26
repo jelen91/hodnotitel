@@ -14,7 +14,7 @@ const LS = {
   improvisers: "tm_improvisers",
 };
 
-type Improviser = { id: string; name: string; topic: string; evaluation: string; ts: number };
+type Improviser = { id: string; name: string; topic: string; transcript?: string; evaluation: string; ts: number };
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
@@ -163,8 +163,18 @@ export default function Page() {
   const [improvisers, setImprovisers] = useState<Improviser[]>([]);
   const [impName, setImpName] = useState("");
   const [impTopic, setImpTopic] = useState("");
+  const [impTranscript, setImpTranscript] = useState("");
   const [impEval, setImpEval] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [impRecording, setImpRecording] = useState(false);
+  const [impElapsed, setImpElapsed] = useState(0);
+  const [impBusy, setImpBusy] = useState(false);
+
+  const impRecogRef = useRef<any>(null);
+  const impRecordingRef = useRef(false);
+  const impFinalRef = useRef("");
+  const impStartTsRef = useRef(0);
+  const impTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const recogRef = useRef<any>(null);
   const recordingRef = useRef(false);
@@ -365,11 +375,14 @@ export default function Page() {
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      if (recogRef.current) {
-        try {
-          recogRef.current.stop();
-        } catch {
-          /* noop */
+      if (impTimerRef.current) clearInterval(impTimerRef.current);
+      for (const ref of [recogRef, impRecogRef]) {
+        if (ref.current) {
+          try {
+            ref.current.stop();
+          } catch {
+            /* noop */
+          }
         }
       }
     };
@@ -391,7 +404,10 @@ export default function Page() {
     setEditingId(null);
     setImpName("");
     setImpTopic("");
+    setImpTranscript("");
     setImpEval("");
+    setImpElapsed(0);
+    if (impRecordingRef.current) stopImpRec();
   };
   const submitImproviser = () => {
     const name = impName.trim();
@@ -402,11 +418,20 @@ export default function Page() {
     if (editingId) {
       persistImprovisers(
         improvisers.map((im) =>
-          im.id === editingId ? { ...im, name, topic: impTopic.trim(), evaluation: impEval } : im,
+          im.id === editingId
+            ? { ...im, name, topic: impTopic.trim(), transcript: impTranscript.trim(), evaluation: impEval }
+            : im,
         ),
       );
     } else {
-      const item: Improviser = { id: genId(), name, topic: impTopic.trim(), evaluation: impEval, ts: Date.now() };
+      const item: Improviser = {
+        id: genId(),
+        name,
+        topic: impTopic.trim(),
+        transcript: impTranscript.trim(),
+        evaluation: impEval,
+        ts: Date.now(),
+      };
       persistImprovisers([item, ...improvisers]);
     }
     resetImpForm();
@@ -416,6 +441,7 @@ export default function Page() {
     setEditingId(im.id);
     setImpName(im.name);
     setImpTopic(im.topic);
+    setImpTranscript(im.transcript || "");
     setImpEval(im.evaluation);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -431,6 +457,119 @@ export default function Page() {
       hour: "2-digit",
       minute: "2-digit",
     });
+
+  // ---- nahrávání odpovědi improvizátora ----
+  const startImpRec = () => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      showToast("Prohlížeč nepodporuje rozpoznávání řeči — použij Chrome/Edge nebo vlož odpověď ručně.");
+      return;
+    }
+    impFinalRef.current = impTranscript ? impTranscript.replace(/\s*$/, "") + " " : "";
+    const r = new SR();
+    r.lang = lang;
+    r.continuous = true;
+    r.interimResults = true;
+    r.onresult = (e: any) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const res = e.results[i];
+        if (res.isFinal) impFinalRef.current += res[0].transcript;
+        else interim += res[0].transcript;
+      }
+      setImpTranscript(impFinalRef.current + interim);
+    };
+    r.onerror = (e: any) => {
+      if (e.error === "no-speech" || e.error === "aborted") return;
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        showToast("Mikrofon nepovolen.");
+        stopImpRec();
+      } else {
+        showToast("Chyba rozpoznávání: " + e.error);
+      }
+    };
+    r.onend = () => {
+      if (impRecordingRef.current) {
+        try {
+          r.start();
+        } catch {
+          /* už běží */
+        }
+      }
+    };
+    impRecogRef.current = r;
+    try {
+      r.start();
+    } catch (e: any) {
+      showToast("Nelze spustit nahrávání: " + e.message);
+      return;
+    }
+    impRecordingRef.current = true;
+    setImpRecording(true);
+    impStartTsRef.current = Date.now();
+    if (impTimerRef.current) clearInterval(impTimerRef.current);
+    impTimerRef.current = setInterval(
+      () => setImpElapsed(Math.floor((Date.now() - impStartTsRef.current) / 1000)),
+      250,
+    );
+    setImpElapsed(0);
+  };
+  const stopImpRec = () => {
+    impRecordingRef.current = false;
+    setImpRecording(false);
+    if (impRecogRef.current) {
+      try {
+        impRecogRef.current.stop();
+      } catch {
+        /* noop */
+      }
+      impRecogRef.current = null;
+    }
+    if (impTimerRef.current) {
+      clearInterval(impTimerRef.current);
+      impTimerRef.current = null;
+    }
+  };
+  const evaluateImprov = async () => {
+    const t = impTranscript.trim();
+    if (!t) {
+      showToast("Nejdřív nahraj nebo vlož odpověď improvizátora.");
+      return;
+    }
+    if (impRecordingRef.current) stopImpRec();
+    setImpBusy(true);
+    setImpEval("");
+    try {
+      const resp = await fetch("/api/evaluate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ lang, mode: "improv", topic: impTopic, transcript: t }),
+      });
+      if (!resp.ok || !resp.body) {
+        let msg = "HTTP " + resp.status;
+        try {
+          const j = await resp.json();
+          if (j.error) msg = j.error;
+        } catch {
+          /* noop */
+        }
+        throw new Error(msg);
+      }
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder();
+      let acc = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        acc += dec.decode(value, { stream: true });
+        setImpEval(acc);
+      }
+    } catch (err: any) {
+      showToast("Chyba hodnocení: " + (err?.message || "neznámá"));
+    } finally {
+      setImpBusy(false);
+    }
+  };
 
   return (
     <div className="wrap">
@@ -646,13 +785,49 @@ export default function Page() {
               onChange={(e) => setImpTopic(e.target.value)}
               placeholder="Zadané téma Table Topics…"
             />
-            <label className="field">Hodnocení</label>
+            <label className="field">Odpověď improvizátora (přepis)</label>
+            <div className="imp-rec">
+              {!impRecording ? (
+                <button type="button" className="btn" onClick={startImpRec}>
+                  ● Nahrávat odpověď
+                </button>
+              ) : (
+                <button type="button" className="btn danger" onClick={stopImpRec}>
+                  ■ Stop
+                </button>
+              )}
+              <span className="imp-clock">{fmt(impElapsed)}</span>
+            </div>
+            <textarea
+              className="note-paper"
+              style={{ minHeight: 110 }}
+              value={impTranscript}
+              onChange={(e) => {
+                setImpTranscript(e.target.value);
+                impFinalRef.current = e.target.value;
+              }}
+              placeholder="Přepis odpovědi… (nebo vlož / uprav ručně)"
+            />
+            <div className="btn-row">
+              <button type="button" className="btn" onClick={evaluateImprov} disabled={impBusy}>
+                {impBusy ? (
+                  <>
+                    <span className="spin" />
+                    Vyhodnocuji…
+                  </>
+                ) : (
+                  "✨ Vyhodnotit odpověď (AI)"
+                )}
+              </button>
+            </div>
+
+            <label className="field">Hodnocení (AI návrh — uprav podle sebe)</label>
             <textarea
               className="note-paper"
               style={{ minHeight: 140 }}
               value={impEval}
               onChange={(e) => setImpEval(e.target.value)}
-              placeholder="Co se povedlo, co zlepšit, využití času, struktura odpovědi, pointa…"
+              placeholder="Sem přijde AI hodnocení odpovědi — můžeš ho upravit, než uložíš. Nebo napiš vlastní."
             />
             <div className="btn-row">
               <button className="btn primary" onClick={submitImproviser}>
