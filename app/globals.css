@@ -138,3 +138,28 @@ footer { color: var(--muted); font-size: 12px; margin-top: 26px; text-align: cen
 .langtab { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--paper); }
 .langtab button { background: transparent; color: var(--muted); border: 0; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .langtab button.active { background: var(--accent-2); color: #fff; }
+
+/* záložky (sekce) */
+.tabs { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 2px solid var(--line); }
+.tabs button {
+  appearance: none; border: 1px solid var(--line); border-bottom: none; background: var(--paper-2);
+  color: var(--muted); font-family: var(--hand); font-size: 17px; font-weight: 600; cursor: pointer;
+  padding: 9px 18px; border-radius: 10px 10px 0 0; margin-bottom: -2px; transition: 0.15s;
+}
+.tabs button:hover { color: var(--ink); }
+.tabs button.active { background: var(--paper); color: var(--accent); border-color: var(--line); border-bottom: 2px solid var(--paper); }
+
+/* improvizace */
+.improv { max-width: 760px; margin: 0 auto; }
+.imp-list { display: flex; flex-direction: column; gap: 12px; }
+.imp-item { background: #fffdf6; border: 1px solid var(--line); border-left: 3px solid var(--margin); border-radius: 8px; padding: 12px 14px; }
+.imp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.imp-name { font-family: var(--hand); font-size: 19px; color: var(--ink); font-weight: 700; }
+.imp-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-sm { appearance: none; border: 1px solid var(--line); background: var(--paper-2); color: var(--ink); padding: 5px 11px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.15s; }
+.btn-sm:hover { border-color: var(--accent); }
+.btn-sm.danger { background: #f7e2e0; border-color: #e7b3af; color: #9c2a26; }
+.btn-sm.danger:hover { border-color: var(--red); }
+.imp-topic { margin-top: 6px; font-size: 13px; color: var(--accent); font-style: italic; }
+.imp-eval { margin-top: 8px; white-space: pre-wrap; line-height: 1.55; }
+.imp-meta { margin-top: 8px; font-size: 11px; color: var(--muted); }

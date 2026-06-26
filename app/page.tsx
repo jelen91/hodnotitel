@@ -11,7 +11,13 @@ const LS = {
   red: "tm_red",
   context: "tm_context",
   notes: "tm_notes",
+  improvisers: "tm_improvisers",
 };
+
+type Improviser = { id: string; name: string; topic: string; evaluation: string; ts: number };
+function genId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
 
 // Pořadí = priorita: delší / specifičtější fráze první.
 const FILLER_WORDS: Record<Lang, string[]> = {
@@ -152,6 +158,14 @@ export default function Page() {
   const [notes, setNotes] = useState("");
   const [showFillers, setShowFillers] = useState(false);
 
+  // záložky + improvizace
+  const [tab, setTab] = useState<"speech" | "improv">("speech");
+  const [improvisers, setImprovisers] = useState<Improviser[]>([]);
+  const [impName, setImpName] = useState("");
+  const [impTopic, setImpTopic] = useState("");
+  const [impEval, setImpEval] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const recogRef = useRef<any>(null);
   const recordingRef = useRef(false);
   const finalTextRef = useRef("");
@@ -173,6 +187,12 @@ export default function Page() {
     if (r) setRed(+r);
     if (c) setContext(c);
     if (n) setNotes(n);
+    try {
+      const imp = localStorage.getItem(LS.improvisers);
+      if (imp) setImprovisers(JSON.parse(imp));
+    } catch {
+      /* ignoruj poškozená data */
+    }
   }, []);
 
   const showToast = useCallback((msg: string) => {
@@ -362,6 +382,56 @@ export default function Page() {
     setElapsed(0);
   };
 
+  // ---- improvizace (localStorage) ----
+  const persistImprovisers = (list: Improviser[]) => {
+    setImprovisers(list);
+    localStorage.setItem(LS.improvisers, JSON.stringify(list));
+  };
+  const resetImpForm = () => {
+    setEditingId(null);
+    setImpName("");
+    setImpTopic("");
+    setImpEval("");
+  };
+  const submitImproviser = () => {
+    const name = impName.trim();
+    if (!name) {
+      showToast("Zadej jméno improvizátora.");
+      return;
+    }
+    if (editingId) {
+      persistImprovisers(
+        improvisers.map((im) =>
+          im.id === editingId ? { ...im, name, topic: impTopic.trim(), evaluation: impEval } : im,
+        ),
+      );
+    } else {
+      const item: Improviser = { id: genId(), name, topic: impTopic.trim(), evaluation: impEval, ts: Date.now() };
+      persistImprovisers([item, ...improvisers]);
+    }
+    resetImpForm();
+    showToast("Uloženo.");
+  };
+  const editImproviser = (im: Improviser) => {
+    setEditingId(im.id);
+    setImpName(im.name);
+    setImpTopic(im.topic);
+    setImpEval(im.evaluation);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const deleteImproviser = (id: string) => {
+    persistImprovisers(improvisers.filter((im) => im.id !== id));
+    if (editingId === id) resetImpForm();
+  };
+  const impDate = (ts: number) =>
+    new Date(ts).toLocaleString("cs-CZ", {
+      day: "numeric",
+      month: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
   return (
     <div className="wrap">
       <header>
@@ -381,6 +451,16 @@ export default function Page() {
         </div>
       </header>
 
+      <div className="tabs">
+        <button className={tab === "speech" ? "active" : ""} onClick={() => setTab("speech")}>
+          🎤 Hodnocení projevu
+        </button>
+        <button className={tab === "improv" ? "active" : ""} onClick={() => setTab("improv")}>
+          💬 Improvizace
+        </button>
+      </div>
+
+      {tab === "speech" && (
       <div className="grid">
         {/* LEVÝ SLOUPEC */}
         <div>
@@ -546,6 +626,75 @@ export default function Page() {
           </div>
         </div>
       </div>
+      )}
+
+      {tab === "improv" && (
+        <div className="improv">
+          <div className="card">
+            <h2>{editingId ? "✏️ Upravit hodnocení" : "➕ Nový improvizátor"}</h2>
+            <label className="field">Jméno improvizátora</label>
+            <input
+              type="text"
+              value={impName}
+              onChange={(e) => setImpName(e.target.value)}
+              placeholder="Např. Jana N."
+            />
+            <label className="field">Téma / otázka (volitelné)</label>
+            <input
+              type="text"
+              value={impTopic}
+              onChange={(e) => setImpTopic(e.target.value)}
+              placeholder="Zadané téma Table Topics…"
+            />
+            <label className="field">Hodnocení</label>
+            <textarea
+              className="note-paper"
+              style={{ minHeight: 140 }}
+              value={impEval}
+              onChange={(e) => setImpEval(e.target.value)}
+              placeholder="Co se povedlo, co zlepšit, využití času, struktura odpovědi, pointa…"
+            />
+            <div className="btn-row">
+              <button className="btn primary" onClick={submitImproviser}>
+                {editingId ? "Uložit změny" : "Uložit improvizátora"}
+              </button>
+              {editingId && (
+                <button className="btn" onClick={resetImpForm}>
+                  Zrušit úpravu
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="card" style={{ marginTop: 16 }}>
+            <h2>Uložení improvizátoři ({improvisers.length})</h2>
+            {improvisers.length === 0 ? (
+              <div className="placeholder">Zatím nikdo uložený. Přidej improvizátora formulářem nahoře.</div>
+            ) : (
+              <div className="imp-list">
+                {improvisers.map((im) => (
+                  <div className="imp-item" key={im.id}>
+                    <div className="imp-head">
+                      <div className="imp-name">{im.name}</div>
+                      <div className="imp-actions">
+                        <button className="btn-sm" onClick={() => editImproviser(im)}>
+                          Upravit
+                        </button>
+                        <button className="btn-sm danger" onClick={() => deleteImproviser(im.id)}>
+                          Smazat
+                        </button>
+                      </div>
+                    </div>
+                    {im.topic && <div className="imp-topic">💡 {im.topic}</div>}
+                    {im.evaluation.trim() && <div className="imp-eval">{im.evaluation}</div>}
+                    <div className="imp-meta">{impDate(im.ts)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <footer>
         Soukromí: zvuk se přepisuje přes rozpoznávání řeči v prohlížeči (Chrome posílá audio Googlu), přepis se posílá na
