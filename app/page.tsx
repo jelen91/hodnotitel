@@ -70,6 +70,23 @@ function findFillers(t: string, lang: Lang): FillerHit[] {
   return hits;
 }
 
+// „ehmm“ / „ehm“ → jedna položka; výstup např. „ehm ×4, jako ×2“
+function fillerSummaryFrom(hits: FillerHit[]): string {
+  const counts = new Map<string, number>();
+  for (const h of hits) {
+    const key = h.word.toLowerCase().replace(/(.)\1+/g, "$1").replace(/\s+/g, " ");
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([w, c]) => `${w} ×${c}`)
+    .join(", ");
+}
+
+// rychlé štítky pro poznámky za pochodu
+const QUICK_TAGS = ["👋 Gesta", "👁️ Oční kontakt", "🚶 Pohyb", "🔊 Hlas", "⏸️ Pauza", "👏 Silný moment", "❓ Nejasné"];
+
 const I18N = {
   "cs-CZ": { tr: "Přepis projevu", thinking: "Analyzuji projev…" },
   "en-US": { tr: "Speech transcript", thinking: "Analyzing the speech…" },
@@ -147,6 +164,7 @@ export default function Page() {
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [evalHtml, setEvalHtml] = useState("");
+  const [evalMd, setEvalMd] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
@@ -176,6 +194,7 @@ export default function Page() {
   const impStartTsRef = useRef(0);
   const impTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const notesRef = useRef<HTMLTextAreaElement | null>(null);
   const recogRef = useRef<any>(null);
   const recordingRef = useRef(false);
   const finalTextRef = useRef("");
@@ -325,6 +344,7 @@ export default function Page() {
 
     setBusy(true);
     setEvalHtml("");
+    setEvalMd("");
 
     try {
       const resp = await fetch("/api/evaluate", {
@@ -336,6 +356,10 @@ export default function Page() {
           durationSec: startTsRef.current ? Math.floor((Date.now() - startTsRef.current) / 1000) : elapsed,
           wordCount: countWords(t),
           context,
+          fillerSummary: fillerSummaryFrom(findFillers(t, lang)),
+          notes,
+          greenSec: green,
+          redSec: red,
         }),
       });
 
@@ -357,6 +381,7 @@ export default function Page() {
         const { value, done } = await reader.read();
         if (done) break;
         acc += dec.decode(value, { stream: true });
+        setEvalMd(acc);
         setEvalHtml(renderMarkdown(acc));
       }
       if (!acc.trim()) setEvalHtml('<div class="placeholder">Model nevrátil žádný text. Zkus to znovu.</div>');
@@ -369,7 +394,33 @@ export default function Page() {
     } finally {
       setBusy(false);
     }
-  }, [transcript, lang, context, elapsed, showToast, stopRecording]);
+  }, [transcript, lang, context, notes, green, red, elapsed, showToast, stopRecording]);
+
+  // rychlá poznámka se štítkem a časovou značkou (během nahrávání)
+  const addQuickNote = (label: string) => {
+    const ts = recordingRef.current || elapsed > 0 ? `[${fmt(elapsed)}] ` : "";
+    const next = (notes.trim() ? notes.replace(/\s*$/, "") + "\n" : "") + ts + label + ": ";
+    setNotes(next);
+    persist(LS.notes, next);
+    requestAnimationFrame(() => {
+      const ta = notesRef.current;
+      if (ta) {
+        ta.focus();
+        ta.selectionStart = ta.selectionEnd = ta.value.length;
+        ta.scrollTop = ta.scrollHeight;
+      }
+    });
+  };
+
+  const copyEval = async () => {
+    if (!evalMd.trim()) return;
+    try {
+      await navigator.clipboard.writeText(evalMd);
+      showToast("Hodnocení zkopírováno do schránky.");
+    } catch {
+      showToast("Kopírování se nepovedlo.");
+    }
+  };
 
   // úklid při odmontování
   useEffect(() => {
@@ -392,6 +443,7 @@ export default function Page() {
     setTranscript("");
     finalTextRef.current = "";
     setEvalHtml("");
+    setEvalMd("");
     setElapsed(0);
   };
 
@@ -711,10 +763,18 @@ export default function Page() {
         <div>
           <div className="card">
             <h2>✏️ Moje poznámky</h2>
+            <div className="tagrow">
+              {QUICK_TAGS.map((t) => (
+                <button key={t} type="button" className="tag" onClick={() => addQuickNote(t)} title="Přidá poznámku s časem projevu">
+                  {t}
+                </button>
+              ))}
+            </div>
             <textarea
+              ref={notesRef}
               className="note-paper"
               style={{ minHeight: 160 }}
-              placeholder="Sem si piš vlastní postřehy během projevu — řeč těla, gesta, oční kontakt, energie, hlas… Uloží se automaticky."
+              placeholder="Klikni na štítek nahoře (vloží se i čas projevu), nebo piš rovnou — řeč těla, gesta, energie… AI je zapracuje do hodnocení. Uloží se automaticky."
               value={notes}
               onChange={(e) => {
                 setNotes(e.target.value);
@@ -745,7 +805,14 @@ export default function Page() {
           </div>
 
           <div className="card" style={{ marginTop: 16 }}>
-            <h2>Hodnocení pro tebe</h2>
+            <div className="card-head">
+              <h2>Hodnocení pro tebe</h2>
+              {evalMd.trim() && !busy && (
+                <button type="button" className="btn-sm" onClick={copyEval}>
+                  📋 Zkopírovat
+                </button>
+              )}
+            </div>
             <div className="eval">
               {busy && !evalHtml ? (
                 <div className="placeholder">
@@ -756,9 +823,9 @@ export default function Page() {
                 <div dangerouslySetInnerHTML={{ __html: evalHtml }} />
               ) : (
                 <div className="placeholder">
-                  Po skončení projevu (nebo kliknutí na „Vyhodnotit“) se tu objeví shrnutí:
+                  Po skončení projevu (nebo kliknutí na „Vyhodnotit“) se tu objeví stručný tahák:
                   <br />
-                  co vypíchnout, co zlepšit a zapamatovatelné momenty.
+                  co pochválit, co doporučit, citace — a osnova hodnocení, kterou můžeš rovnou číst.
                 </div>
               )}
             </div>

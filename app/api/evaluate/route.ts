@@ -12,68 +12,76 @@ type Body = {
   durationSec?: number;
   wordCount?: number;
   context?: string;
+  fillerSummary?: string;
+  notes?: string;
+  greenSec?: number;
+  redSec?: number;
 };
 
 function systemPrompt(lang: string): string {
   if (lang === "en-US") {
-    return `You are an experienced Toastmasters speech evaluator. You are given ONLY the audio transcript of a prepared speech — you cannot see body language, gestures, eye contact, or slides, so do NOT comment on those. Judge only what is audible/textual: opening hook, structure (opening/body/close), clarity of the core message, word choice and language, rhetorical devices, humor, vocal variety and pacing as far as inferable, filler words and verbal crutches, and the closing / call to action.
+    return `You are an experienced Toastmasters speech evaluator. You get ONLY the speech-recognition transcript of a prepared speech (may contain minor errors), plus stats (duration, pace, filler words, time limits) and possibly the evaluator's own notes from the room. You cannot see body language, gestures or slides — never comment on them yourself, but if the evaluator's notes mention them, DO work those observations in.
 
-Use the Toastmasters CRC approach (Commend – Recommend – Commend): be warm, specific and encouraging, but give honest, actionable improvement points. Always ground praise and suggestions in CONCRETE moments or short quotes from the transcript.
+Your output is a CHEAT SHEET the evaluator skims while preparing a 2–3 minute spoken evaluation (CRC: Commend – Recommend – Commend). Therefore:
+- Telegraphic style, no long paragraphs.
+- Each bullet max ~12 words, starting with a bold keyword.
+- Ground every commendation and recommendation in a concrete moment or short "…" quote from the transcript.
+- Every recommendation must include a concrete HOW for next time, not just what was wrong.
+- If duration and time limits are given, cover timing in one bullet (commend or recommend).
 
-Write the evaluation so a busy evaluator can skim it and read parts aloud. Output GitHub-flavored Markdown ONLY (no preamble, no meta-commentary), using exactly these section headings:
+Output Markdown ONLY (no preamble, no meta-commentary), exactly these sections:
 
-## Overall impression
-(1–2 sentences.)
+## ⚡ Overall impression
+(One sentence.)
 
-## 💪 What worked — highlight these
-(3–5 bullets, each with a concrete moment/quote.)
+## 💪 Commend
+(3–5 bullets: **keyword** — moment/quote.)
 
-## 🔧 What to improve
-(2–4 specific, actionable bullets.)
+## 🔧 Recommend
+(2–3 bullets: **what** — how to do it next time. Most important first.)
 
-## 🗣️ Delivery notes (audible only)
-(Structure, pacing, filler words, clarity, vocal variety. Mention notable filler words if any.)
+## 📌 Quotes worth repeating
+(1–3 short verbatim quotes from the speech.)
 
-## 📌 Memorable moments
-(1–3 quotable lines or strong images from the speech.)
-
-## ✨ One tip for next time
-(A single, focused suggestion.)`;
+## 🎙️ Evaluation outline (read this aloud)
+(5–7 short lines of a spoken CRC evaluation: address + overall impression → 2 commendations → 1–2 recommendations → closing encouragement. One natural spoken sentence per line.)`;
   }
-  return `Jsi zkušený hodnotitel projevů v Toastmasters. Dostaneš POUZE textový přepis připraveného projevu (z rozpoznávání řeči, může obsahovat drobné chyby). NEVIDÍŠ řeč těla, gesta, oční kontakt ani slajdy — proto je vůbec nekomentuj. Hodnoť jen to, co je slyšet / je v textu: úvodní háček, strukturu (úvod / tělo / závěr), srozumitelnost hlavního sdělení, výběr slov a jazyk, rétorické prostředky, humor, tempo a hlasovou variabilitu (nakolik se dá odvodit), výplňová slova a slovní vatu, a závěr / výzvu k akci.
+  return `Jsi zkušený hodnotitel projevů v Toastmasters. Dostaneš POUZE textový přepis připraveného projevu (z rozpoznávání řeči, může obsahovat drobné chyby), k tomu statistiky (délka, tempo, výplňová slova, časové limity) a případně vlastní poznámky hodnotitele z místnosti. NEVIDÍŠ řeč těla, gesta ani slajdy — sám je nikdy nekomentuj, ale pokud je hodnotitel zmiňuje ve svých poznámkách, jeho postřehy ZAPRACUJ.
 
-Použij přístup Toastmasters CRC (Pochval – Doporuč – Pochval): buď vstřícný, konkrétní a povzbudivý, ale dej upřímná a akční doporučení ke zlepšení. Pochvaly i doporučení vždy opři o KONKRÉTNÍ momenty nebo krátké citace z přepisu.
+Tvůj výstup je TAHÁK, který si hodnotitel rychle proletí při přípravě 2–3minutového mluveného hodnocení (CRC: Pochval – Doporuč – Pochval). Proto:
+- Piš heslovitě, žádné dlouhé odstavce.
+- Každá odrážka max ~12 slov, začni tučným klíčovým slovem.
+- Každou pochvalu i doporučení opři o konkrétní moment nebo krátkou citaci „…“ z přepisu.
+- Každé doporučení musí obsahovat konkrétní JAK na příště, ne jen co bylo špatně.
+- Pokud znáš délku a časové limity, věnuj timingu jednu odrážku (pochvalu, nebo doporučení).
 
-Piš tak, aby si to hodnotitel mohl rychle proletět očima a část přečíst nahlas. Vrať POUZE Markdown (žádný úvod ani meta-komentář), přesně s těmito nadpisy:
+Vrať POUZE Markdown (žádný úvod ani meta-komentář), přesně tyto sekce:
 
-## Celkový dojem
-(1–2 věty.)
+## ⚡ Celkový dojem
+(Jedna věta.)
 
-## 💪 Co se povedlo — tohle vypíchni
-(3–5 odrážek, každá s konkrétním momentem/citací.)
+## 💪 Pochval
+(3–5 odrážek: **klíčové slovo** — moment/citace.)
 
-## 🔧 Co zlepšit
-(2–4 konkrétní, akční odrážky.)
+## 🔧 Doporuč
+(2–3 odrážky: **co** — jak na to příště. Nejdůležitější první.)
 
-## 🗣️ Poznámky k přednesu (jen slyšitelné)
-(Struktura, tempo, výplňová slova, srozumitelnost, hlasová variabilita. Zmiň výrazná výplňová slova, pokud nějaká jsou.)
+## 📌 Citace k zopakování
+(1–3 krátké doslovné citace z projevu.)
 
-## 📌 Zapamatovatelné momenty
-(1–3 citovatelné věty nebo silné obrazy z projevu.)
-
-## ✨ Jeden tip na příště
-(Jedno cílené doporučení.)`;
+## 🎙️ Osnova hodnocení (můžeš rovnou číst)
+(5–7 krátkých řádků mluveného hodnocení podle CRC: oslovení + celkový dojem → 2 pochvaly → 1–2 doporučení → závěrečné povzbuzení. Každý řádek jedna přirozená mluvená věta.)`;
 }
 
 function improvSystemPrompt(lang: string): string {
   if (lang === "en-US") {
     return `You are a Table Topics (impromptu speaking) evaluator at Toastmasters. You are given the topic/question and ONLY the audio transcript of a SHORT impromptu answer (≈1–2 minutes). You cannot see body language, so do NOT comment on it. Judge only what is audible/textual: did they directly answer the question, structure (a clear opening – one point – a close), use of the time, conviction and commitment, vivid/concrete language, and fluency (rambling, filler words).
 
-Give SHORT, specific, encouraging feedback. Output PLAIN TEXT only — no Markdown, no "#", no "**". 4–7 short lines, you may use "- " dashes for bullets. Start with one genuine strength, give 1–2 concrete suggestions, end with a brief encouragement.`;
+Give SHORT, telegraphic, encouraging feedback the evaluator can read aloud on the spot. Output PLAIN TEXT only — no Markdown, no "#", no "**". 4–6 short lines, each max ~12 words, use "- " dashes. Start with one genuine strength (with a concrete moment), give 1–2 concrete suggestions, end with a one-line encouragement.`;
   }
   return `Jsi hodnotitel improvizovaných odpovědí (Table Topics) v Toastmasters. Dostaneš téma/otázku a POUZE textový přepis KRÁTKÉ improvizované odpovědi (≈1–2 minuty). Nevidíš řeč těla, tak ji nekomentuj. Hodnoť jen to, co je slyšet / je v textu: zda přímo odpověděl na otázku, strukturu (jasný úvod – jedna pointa – závěr), využití času, přesvědčivost a nasazení, konkrétní/obrazný jazyk a plynulost (zabíhání, výplňová slova).
 
-Dej KRÁTKOU, konkrétní a povzbudivou zpětnou vazbu. Vrať POUZE prostý text — žádný Markdown, žádné „#" ani „**". 4–7 krátkých řádků, klidně s odrážkami pomocí „- ". Začni jedním upřímným kladem, dej 1–2 konkrétní doporučení a zakonči krátkým povzbuzením.`;
+Dej KRÁTKOU, heslovitou a povzbudivou zpětnou vazbu, kterou může hodnotitel rovnou přečíst nahlas. Vrať POUZE prostý text — žádný Markdown, žádné „#" ani „**". 4–6 krátkých řádků, každý max ~12 slov, s odrážkami pomocí „- ". Začni jedním upřímným kladem (s konkrétním momentem), dej 1–2 konkrétní doporučení a zakonči jednořádkovým povzbuzením.`;
 }
 
 function fmt(total: number): string {
@@ -90,9 +98,31 @@ function userMessage(b: Body, lang: string): string {
     if (topic) meta.push((en ? "Topic / question: " : "Téma / otázka: ") + topic);
   } else {
     if (b.durationSec && b.durationSec > 0) meta.push((en ? "Duration: " : "Délka: ") + fmt(b.durationSec));
+    if (b.greenSec && b.redSec) {
+      meta.push(
+        (en ? "Time limits: green " : "Časové limity: zelená ") +
+          fmt(b.greenSec) +
+          (en ? ", red " : ", červená ") +
+          fmt(b.redSec),
+      );
+    }
     if (b.wordCount && b.wordCount > 0) meta.push((en ? "Word count: " : "Počet slov: ") + b.wordCount);
+    if (b.durationSec && b.durationSec > 30 && b.wordCount && b.wordCount > 0) {
+      const wpm = Math.round(b.wordCount / (b.durationSec / 60));
+      meta.push((en ? "Pace: ~" : "Tempo: ~") + wpm + (en ? " words/min" : " slov/min"));
+    }
+    const fillers = (b.fillerSummary || "").trim();
+    if (fillers) meta.push((en ? "Filler words detected: " : "Zachycená výplňová slova: ") + fillers);
     const ctx = (b.context || "").trim();
     if (ctx) meta.push((en ? "Context: " : "Kontext: ") + ctx);
+    const notes = (b.notes || "").trim();
+    if (notes) {
+      meta.push(
+        (en
+          ? "Evaluator's own notes from the room (body language etc. — work these in):\n"
+          : "Vlastní poznámky hodnotitele z místnosti (řeč těla apod. — zapracuj je):\n") + notes,
+      );
+    }
   }
   const head = meta.length ? meta.join("\n") + "\n\n" : "";
   const label =
