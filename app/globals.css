@@ -112,6 +112,14 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.55; }
 /* zvýrazněná karta „Moje hodnocení“ — z té se čte */
 .card.highlight { border: 2px solid var(--accent); box-shadow: 0 4px 16px rgba(47, 109, 176, 0.22); }
 
+/* čitelný náhled, kliknutím se přepne do editace */
+.readpane { white-space: pre-wrap; cursor: text; min-height: 140px; transition: border-color 0.15s; }
+.readpane:hover { border-color: var(--accent); }
+.readpane.empty { color: #b3a98f; }
+.outline-text { font-size: 16px; }
+.notes-mirror { min-height: 76px; font-size: 14px; }
+.subhead { font-family: var(--hand); color: var(--accent); font-size: 16px; margin: 14px 0 8px; }
+
 details.settings summary { cursor: pointer; color: var(--muted); font-size: 13px; user-select: none; }
 details.settings[open] summary { margin-bottom: 8px; }
 
