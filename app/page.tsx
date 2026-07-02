@@ -11,6 +11,7 @@ const LS = {
   red: "tm_red",
   context: "tm_context",
   notes: "tm_notes",
+  myeval: "tm_myeval",
   improvisers: "tm_improvisers",
 };
 
@@ -86,6 +87,13 @@ function fillerSummaryFrom(hits: FillerHit[]): string {
 
 // rychlé štítky pro poznámky za pochodu
 const QUICK_TAGS = ["👋 Gesta", "👁️ Oční kontakt", "🚶 Pohyb", "🔊 Hlas", "⏸️ Pauza", "👏 Silný moment", "❓ Nejasné"];
+
+// oddělí sekci „🎙️ Osnova hodnocení“ od zbytku AI výstupu
+function splitOutline(md: string): { rest: string; outline: string } {
+  const m = md.match(/^##\s*\u{1F399}[^\n]*\n?/mu);
+  if (!m || m.index === undefined) return { rest: md, outline: "" };
+  return { rest: md.slice(0, m.index), outline: md.slice(m.index + m[0].length) };
+}
 
 const I18N = {
   "cs-CZ": { tr: "Přepis projevu", thinking: "Analyzuji projev…" },
@@ -165,6 +173,7 @@ export default function Page() {
   const [transcript, setTranscript] = useState("");
   const [evalHtml, setEvalHtml] = useState("");
   const [evalMd, setEvalMd] = useState("");
+  const [myEval, setMyEval] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
@@ -211,11 +220,13 @@ export default function Page() {
     const r = localStorage.getItem(LS.red);
     const c = localStorage.getItem(LS.context);
     const n = localStorage.getItem(LS.notes);
+    const me = localStorage.getItem(LS.myeval);
     if (g) setGreen(+g);
     if (a) setAmber(+a);
     if (r) setRed(+r);
     if (c) setContext(c);
     if (n) setNotes(n);
+    if (me) setMyEval(me);
     try {
       const imp = localStorage.getItem(LS.improvisers);
       if (imp) setImprovisers(JSON.parse(imp));
@@ -382,9 +393,20 @@ export default function Page() {
         if (done) break;
         acc += dec.decode(value, { stream: true });
         setEvalMd(acc);
-        setEvalHtml(renderMarkdown(acc));
+        // osnova hodnocení jde zvlášť do editovatelného pole „Moje hodnocení“
+        const { rest, outline } = splitOutline(acc);
+        setEvalHtml(renderMarkdown(rest));
+        if (outline.trim()) setMyEval(outline.replace(/\*\*/g, "").trim());
       }
       if (!acc.trim()) setEvalHtml('<div class="placeholder">Model nevrátil žádný text. Zkus to znovu.</div>');
+      const { outline: finalOutline } = splitOutline(acc);
+      if (finalOutline.trim()) {
+        const merged =
+          finalOutline.replace(/\*\*/g, "").trim() +
+          (notes.trim() ? "\n\n––– Moje poznámky z místnosti –––\n" + notes.trim() : "");
+        setMyEval(merged);
+        persist(LS.myeval, merged);
+      }
     } catch (err: any) {
       setEvalHtml(
         '<div class="placeholder">⚠️ Chyba: ' +
@@ -412,11 +434,11 @@ export default function Page() {
     });
   };
 
-  const copyEval = async () => {
-    if (!evalMd.trim()) return;
+  const copyText = async (text: string) => {
+    if (!text.trim()) return;
     try {
-      await navigator.clipboard.writeText(evalMd);
-      showToast("Hodnocení zkopírováno do schránky.");
+      await navigator.clipboard.writeText(text);
+      showToast("Zkopírováno do schránky.");
     } catch {
       showToast("Kopírování se nepovedlo.");
     }
@@ -804,11 +826,32 @@ export default function Page() {
             </div>
           </div>
 
+          <div className="card highlight" style={{ marginTop: 16 }}>
+            <div className="card-head">
+              <h2>🎙️ Moje hodnocení — čti odsud</h2>
+              {myEval.trim() && (
+                <button type="button" className="btn-sm" onClick={() => copyText(myEval)}>
+                  📋 Zkopírovat
+                </button>
+              )}
+            </div>
+            <textarea
+              className="note-paper"
+              style={{ minHeight: 220 }}
+              value={myEval}
+              onChange={(e) => {
+                setMyEval(e.target.value);
+                persist(LS.myeval, e.target.value);
+              }}
+              placeholder="Po vyhodnocení se sem vloží osnova hodnocení od AI + tvoje poznámky z místnosti. Uprav si text podle sebe — při hodnocení pak čteš rovnou odsud."
+            />
+          </div>
+
           <div className="card" style={{ marginTop: 16 }}>
             <div className="card-head">
-              <h2>Hodnocení pro tebe</h2>
+              <h2>Tahák od AI</h2>
               {evalMd.trim() && !busy && (
-                <button type="button" className="btn-sm" onClick={copyEval}>
+                <button type="button" className="btn-sm" onClick={() => copyText(evalMd)}>
                   📋 Zkopírovat
                 </button>
               )}
@@ -825,7 +868,7 @@ export default function Page() {
                 <div className="placeholder">
                   Po skončení projevu (nebo kliknutí na „Vyhodnotit“) se tu objeví stručný tahák:
                   <br />
-                  co pochválit, co doporučit, citace — a osnova hodnocení, kterou můžeš rovnou číst.
+                  co pochválit, co doporučit a citace. Osnova k přečtení se vloží nahoru do „Moje hodnocení“.
                 </div>
               )}
             </div>
