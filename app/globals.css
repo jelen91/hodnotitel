@@ -98,6 +98,17 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.55; }
 }
 .note-paper::placeholder { color: #b3a98f; }
 
+/* rychlé štítky do poznámek */
+.tagrow { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.tag {
+  appearance: none; border: 1px solid var(--line); background: var(--paper-2); color: var(--ink);
+  padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.15s;
+}
+.tag:hover { border-color: var(--accent); background: #fffdf6; }
+
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.card-head h2 { margin-bottom: 14px; }
+
 details.settings summary { cursor: pointer; color: var(--muted); font-size: 13px; user-select: none; }
 details.settings[open] summary { margin-bottom: 8px; }
 
