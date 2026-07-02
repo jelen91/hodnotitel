@@ -109,6 +109,9 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.55; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .card-head h2 { margin-bottom: 14px; }
 
+/* zvýrazněná karta „Moje hodnocení“ — z té se čte */
+.card.highlight { border: 2px solid var(--accent); box-shadow: 0 4px 16px rgba(47, 109, 176, 0.22); }
+
 details.settings summary { cursor: pointer; color: var(--muted); font-size: 13px; user-select: none; }
 details.settings[open] summary { margin-bottom: 8px; }
 
