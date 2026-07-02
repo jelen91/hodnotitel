@@ -174,6 +174,8 @@ export default function Page() {
   const [evalHtml, setEvalHtml] = useState("");
   const [evalMd, setEvalMd] = useState("");
   const [myEval, setMyEval] = useState("");
+  const [editOutline, setEditOutline] = useState(false);
+  const [editNotesHere, setEditNotesHere] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
@@ -401,11 +403,10 @@ export default function Page() {
       if (!acc.trim()) setEvalHtml('<div class="placeholder">Model nevrátil žádný text. Zkus to znovu.</div>');
       const { outline: finalOutline } = splitOutline(acc);
       if (finalOutline.trim()) {
-        const merged =
-          finalOutline.replace(/\*\*/g, "").trim() +
-          (notes.trim() ? "\n\n––– Moje poznámky z místnosti –––\n" + notes.trim() : "");
-        setMyEval(merged);
-        persist(LS.myeval, merged);
+        const clean = finalOutline.replace(/\*\*/g, "").trim();
+        setMyEval(clean);
+        persist(LS.myeval, clean);
+        setEditOutline(false);
       }
     } catch (err: any) {
       setEvalHtml(
@@ -829,22 +830,63 @@ export default function Page() {
           <div className="card highlight" style={{ marginTop: 16 }}>
             <div className="card-head">
               <h2>🎙️ Moje hodnocení — čti odsud</h2>
-              {myEval.trim() && (
-                <button type="button" className="btn-sm" onClick={() => copyText(myEval)}>
+              {(myEval.trim() || notes.trim()) && (
+                <button
+                  type="button"
+                  className="btn-sm"
+                  onClick={() =>
+                    copyText(myEval.trim() + (notes.trim() ? "\n\n✏️ Poznámky z místnosti:\n" + notes.trim() : ""))
+                  }
+                >
                   📋 Zkopírovat
                 </button>
               )}
             </div>
-            <textarea
-              className="note-paper"
-              style={{ minHeight: 220 }}
-              value={myEval}
-              onChange={(e) => {
-                setMyEval(e.target.value);
-                persist(LS.myeval, e.target.value);
-              }}
-              placeholder="Po vyhodnocení se sem vloží osnova hodnocení od AI + tvoje poznámky z místnosti. Uprav si text podle sebe — při hodnocení pak čteš rovnou odsud."
-            />
+            {editOutline ? (
+              <textarea
+                autoFocus
+                className="note-paper outline-text"
+                style={{ minHeight: 220 }}
+                value={myEval}
+                onChange={(e) => {
+                  setMyEval(e.target.value);
+                  persist(LS.myeval, e.target.value);
+                }}
+                onBlur={() => setEditOutline(false)}
+              />
+            ) : (
+              <div
+                className={"readpane note-paper outline-text" + (myEval.trim() ? "" : " empty")}
+                onClick={() => setEditOutline(true)}
+                title="Klikni pro úpravu"
+              >
+                {myEval.trim() ||
+                  "Po vyhodnocení se sem vloží osnova hodnocení od AI. Klikni a uprav si ji podle sebe — při hodnocení čteš rovnou odsud."}
+              </div>
+            )}
+
+            <div className="subhead">✏️ Moje poznámky z místnosti</div>
+            {editNotesHere ? (
+              <textarea
+                autoFocus
+                className="note-paper"
+                style={{ minHeight: 120 }}
+                value={notes}
+                onChange={(e) => {
+                  setNotes(e.target.value);
+                  persist(LS.notes, e.target.value);
+                }}
+                onBlur={() => setEditNotesHere(false)}
+              />
+            ) : (
+              <div
+                className={"readpane note-paper notes-mirror" + (notes.trim() ? "" : " empty")}
+                onClick={() => setEditNotesHere(true)}
+                title="Klikni pro úpravu"
+              >
+                {notes.trim() || "Zatím žádné poznámky — piš je během projevu nahoře, nebo klikni sem."}
+              </div>
+            )}
           </div>
 
           <div className="card" style={{ marginTop: 16 }}>
